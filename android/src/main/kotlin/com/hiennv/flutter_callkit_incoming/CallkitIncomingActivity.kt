@@ -92,11 +92,8 @@ class CallkitIncomingActivity : Activity() {
     private lateinit var ivAvatar: CircleImageView
 
     private lateinit var llAction: LinearLayout
-    private lateinit var ivAcceptCall: ImageView
-    private lateinit var tvAccept: TextView
-
-    private lateinit var ivDeclineCall: ImageView
-    private lateinit var tvDecline: TextView
+    private lateinit var ivSingleActionCall: ImageView
+    private lateinit var tvSingleAction: TextView
 
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -237,39 +234,24 @@ class CallkitIncomingActivity : Activity() {
             ImageLoaderProvider.loadImage(this@CallkitIncomingActivity, avatarUrl, headers, R.drawable.ic_default_avatar, ivAvatar)
         }
 
-        val callType = data?.getInt(CallkitConstants.EXTRA_CALLKIT_TYPE, 0) ?: 0
-        if (callType > 0) {
-            ivAcceptCall.setImageResource(R.drawable.ic_video)
-        }
         val duration = data?.getLong(CallkitConstants.EXTRA_CALLKIT_DURATION, 0L) ?: 0L
         wakeLockRequest(duration)
 
         finishTimeout(data, duration)
 
-        val textAccept = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_ACCEPT, "")
-        tvAccept.text =
-            if (TextUtils.isEmpty(textAccept)) getString(R.string.text_accept) else textAccept
-        val textDecline = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_DECLINE, "")
-        tvDecline.text =
-            if (TextUtils.isEmpty(textDecline)) getString(R.string.text_decline) else textDecline
+        val textAction = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_ACCEPT, "")
+        tvSingleAction.text =
+            if (TextUtils.isEmpty(textAction)) getString(R.string.text_open_order_details) else textAction
 
-        val acceptCallColor =
+        val actionColor =
             data?.getString(CallkitConstants.EXTRA_CALLKIT_ACCEPT_COLOR, "#4CAF50")
         try {
-            ivAcceptCall.setBackground(AppUtils.createCircleDrawable(Color.parseColor(acceptCallColor)))
-        } catch (error: Exception) {
-        }
-
-        val declineCallColor =
-            data?.getString(CallkitConstants.EXTRA_CALLKIT_DECLINE_COLOR, "#F44336")
-        try {
-            ivDeclineCall.setBackground(AppUtils.createCircleDrawable(Color.parseColor(declineCallColor)))
+            ivSingleActionCall.setBackground(AppUtils.createCircleDrawable(Color.parseColor(actionColor)))
         } catch (error: Exception) {
         }
 
         try {
-            tvAccept.setTextColor(Color.parseColor(textColor))
-            tvDecline.setTextColor(Color.parseColor(textColor))
+            tvSingleAction.setTextColor(Color.parseColor(textColor))
         } catch (error: Exception) {
         }
 
@@ -327,24 +309,19 @@ class CallkitIncomingActivity : Activity() {
         params.setMargins(0, 0, 0, Utils.getNavigationBarHeight(this@CallkitIncomingActivity))
         llAction.layoutParams = params
 
-        ivAcceptCall = findViewById(R.id.ivAcceptCall)
-        tvAccept = findViewById(R.id.tvAccept)
-        ivDeclineCall = findViewById(R.id.ivDeclineCall)
-        tvDecline = findViewById(R.id.tvDecline)
+        ivSingleActionCall = findViewById(R.id.ivSingleActionCall)
+        tvSingleAction = findViewById(R.id.tvSingleAction)
         animateAcceptCall()
 
-        ivAcceptCall.setOnClickListener {
+        ivSingleActionCall.setOnClickListener {
             onAcceptClick()
-        }
-        ivDeclineCall.setOnClickListener {
-            onDeclineClick()
         }
     }
 
     private fun animateAcceptCall() {
         val shakeAnimation =
             AnimationUtils.loadAnimation(this@CallkitIncomingActivity, R.anim.shake_anim)
-        ivAcceptCall.animation = shakeAnimation
+        ivSingleActionCall.animation = shakeAnimation
     }
 
 
