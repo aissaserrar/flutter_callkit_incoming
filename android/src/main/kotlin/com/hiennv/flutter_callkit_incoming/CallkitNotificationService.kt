@@ -88,25 +88,23 @@ class CallkitNotificationService : Service() {
         val callkitNotification =
             getCallkitNotificationManager()?.getOnGoingCallNotification(bundle, false)
         if (callkitNotification != null) {
-            val typeCall = bundle.getInt(CallkitConstants.EXTRA_CALLKIT_TYPE, -1)
             startForeground(
                 callkitNotification.id,
                 callkitNotification.notification,
-                typeCall > 0
             )
         }
     }
 
-    private fun startForeground(notificationId: Int, notification: Notification, isVideo: Boolean) {
+    private fun startForeground(notificationId: Int, notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var mask = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                if (isVideo) {
-                    mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                }
-            }
-            startForeground(notificationId, notification, mask)
+            // Kabsa Driver uses CallKit only as a visual/audio alert for new order
+            // assignments; it never captures microphone or camera. Restrict the FGS
+            // type to phoneCall so Android 16 does not require RECORD_AUDIO/CAMERA.
+            startForeground(
+                notificationId,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
+            )
         } else {
             startForeground(notificationId, notification)
         }
