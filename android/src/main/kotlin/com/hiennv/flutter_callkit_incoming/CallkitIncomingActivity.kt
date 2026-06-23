@@ -27,11 +27,9 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
-import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.hiennv.flutter_callkit_incoming.widgets.RippleRelativeLayout
 import de.hdodenhof.circleimageview.CircleImageView
 import kotlin.math.abs
 import android.view.ViewGroup.MarginLayoutParams
@@ -84,15 +82,13 @@ class CallkitIncomingActivity : Activity() {
     private var endedCallkitIncomingBroadcastReceiver = EndedCallkitIncomingBroadcastReceiver()
 
     private lateinit var ivBackground: ImageView
-    private lateinit var llBackgroundAnimation: RippleRelativeLayout
 
-    private lateinit var tvNameCaller: TextView
-    private lateinit var tvNumber: TextView
-    private lateinit var ivLogo: ImageView
-    private lateinit var ivAvatar: CircleImageView
+    private lateinit var tvTitle: TextView
+    private lateinit var tvSubtitle: TextView
+    private lateinit var ivOrderIcon: CircleImageView
+    private lateinit var tvAddress: TextView
 
     private lateinit var llAction: LinearLayout
-    private lateinit var ivSingleActionCall: ImageView
     private lateinit var tvSingleAction: TextView
 
     @Suppress("DEPRECATION")
@@ -200,38 +196,21 @@ class CallkitIncomingActivity : Activity() {
         }
 
         val textColor = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_COLOR, "#ffffff")
-        val isShowCallID = data?.getBoolean(CallkitConstants.EXTRA_CALLKIT_IS_SHOW_CALL_ID, false)
-        tvNameCaller.text = data?.getString(CallkitConstants.EXTRA_CALLKIT_NAME_CALLER, "")
-        tvNumber.text = data?.getString(CallkitConstants.EXTRA_CALLKIT_HANDLE, "")
-        tvNumber.visibility = if (isShowCallID == true) View.VISIBLE else View.INVISIBLE
+        tvAddress.text = data?.getString(CallkitConstants.EXTRA_CALLKIT_NAME_CALLER, "")
 
         try {
-            tvNameCaller.setTextColor(Color.parseColor(textColor))
-            tvNumber.setTextColor(Color.parseColor(textColor))
+            tvAddress.setTextColor(Color.parseColor(textColor))
         } catch (error: Exception) {
-        }
-
-        val isShowLogo = data?.getBoolean(CallkitConstants.EXTRA_CALLKIT_IS_SHOW_LOGO, false)
-        ivLogo.visibility = if (isShowLogo == true) View.VISIBLE else View.INVISIBLE
-        var logoUrl = data?.getString(CallkitConstants.EXTRA_CALLKIT_LOGO_URL, "")
-        if (!logoUrl.isNullOrEmpty()) {
-            if (!logoUrl.startsWith("http://", true) && !logoUrl.startsWith("https://", true)) {
-                logoUrl = String.format("file:///android_asset/flutter_assets/%s", logoUrl)
-            }
-            val headers =
-                data?.getSerializable(CallkitConstants.EXTRA_CALLKIT_HEADERS) as HashMap<String, Any?>
-            ImageLoaderProvider.loadImage(this@CallkitIncomingActivity, logoUrl, headers, R.drawable.transparent, ivLogo)
         }
 
         var avatarUrl = data?.getString(CallkitConstants.EXTRA_CALLKIT_AVATAR, "")
         if (!avatarUrl.isNullOrEmpty()) {
-            ivAvatar.visibility = View.VISIBLE
             if (!avatarUrl.startsWith("http://", true) && !avatarUrl.startsWith("https://", true)) {
                 avatarUrl = String.format("file:///android_asset/flutter_assets/%s", avatarUrl)
             }
             val headers =
                 data?.getSerializable(CallkitConstants.EXTRA_CALLKIT_HEADERS) as HashMap<String, Any?>
-            ImageLoaderProvider.loadImage(this@CallkitIncomingActivity, avatarUrl, headers, R.drawable.ic_default_avatar, ivAvatar)
+            ImageLoaderProvider.loadImage(this@CallkitIncomingActivity, avatarUrl, headers, R.drawable.ic_default_avatar, ivOrderIcon)
         }
 
         val duration = data?.getLong(CallkitConstants.EXTRA_CALLKIT_DURATION, 0L) ?: 0L
@@ -242,13 +221,6 @@ class CallkitIncomingActivity : Activity() {
         val textAction = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_ACCEPT, "")
         tvSingleAction.text =
             if (TextUtils.isEmpty(textAction)) getString(R.string.text_open_order_details) else textAction
-
-        val actionColor =
-            data?.getString(CallkitConstants.EXTRA_CALLKIT_ACCEPT_COLOR, "#4CAF50")
-        try {
-            ivSingleActionCall.setBackground(AppUtils.createCircleDrawable(Color.parseColor(actionColor)))
-        } catch (error: Exception) {
-        }
 
         try {
             tvSingleAction.setTextColor(Color.parseColor(textColor))
@@ -293,15 +265,11 @@ class CallkitIncomingActivity : Activity() {
 
     private fun initView() {
         ivBackground = findViewById(R.id.ivBackground)
-        llBackgroundAnimation = findViewById(R.id.llBackgroundAnimation)
-        llBackgroundAnimation.layoutParams.height =
-            Utils.getScreenWidth() + Utils.getStatusBarHeight(this@CallkitIncomingActivity)
-        llBackgroundAnimation.startRippleAnimation()
 
-        tvNameCaller = findViewById(R.id.tvNameCaller)
-        tvNumber = findViewById(R.id.tvNumber)
-        ivLogo = findViewById(R.id.ivLogo)
-        ivAvatar = findViewById(R.id.ivAvatar)
+        tvTitle = findViewById(R.id.tvTitle)
+        tvSubtitle = findViewById(R.id.tvSubtitle)
+        ivOrderIcon = findViewById(R.id.ivOrderIcon)
+        tvAddress = findViewById(R.id.tvAddress)
 
         llAction = findViewById(R.id.llAction)
 
@@ -309,19 +277,11 @@ class CallkitIncomingActivity : Activity() {
         params.setMargins(0, 0, 0, Utils.getNavigationBarHeight(this@CallkitIncomingActivity))
         llAction.layoutParams = params
 
-        ivSingleActionCall = findViewById(R.id.ivSingleActionCall)
         tvSingleAction = findViewById(R.id.tvSingleAction)
-        animateAcceptCall()
 
-        ivSingleActionCall.setOnClickListener {
+        tvSingleAction.setOnClickListener {
             onAcceptClick()
         }
-    }
-
-    private fun animateAcceptCall() {
-        val shakeAnimation =
-            AnimationUtils.loadAnimation(this@CallkitIncomingActivity, R.anim.shake_anim)
-        ivSingleActionCall.animation = shakeAnimation
     }
 
 
