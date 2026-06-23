@@ -88,14 +88,14 @@ class CallkitNotificationService : Service() {
         val callkitNotification =
             getCallkitNotificationManager()?.getOnGoingCallNotification(bundle, false)
         if (callkitNotification != null) {
-            startForeground(
+            startCallForeground(
                 callkitNotification.id,
                 callkitNotification.notification,
             )
         }
     }
 
-    private fun startForeground(notificationId: Int, notification: Notification) {
+    private fun startCallForeground(notificationId: Int, notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Kabsa Driver uses CallKit only as a visual/audio alert for new order
             // assignments; it never captures microphone or camera. Restrict the FGS
