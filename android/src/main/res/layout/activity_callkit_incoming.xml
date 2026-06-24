@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- Background -->
     <ImageView
         android:id="@+id/ivBackground"
         android:layout_width="match_parent"
@@ -21,17 +20,15 @@
         android:fitsSystemWindows="false"
         android:orientation="vertical">
 
-        <!-- Top Section: Title, Subtitle, Icon, Address -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingTop="48dp"
+            android:paddingTop="80dp"
             android:paddingHorizontal="24dp">
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
@@ -42,7 +39,6 @@
                 android:textStyle="bold"
                 android:letterSpacing="0.05" />
 
-            <!-- Subtitle -->
             <TextView
                 android:id="@+id/tvSubtitle"
                 android:layout_width="wrap_content"
@@ -52,8 +48,6 @@
                 android:textColor="#E0E0E0"
                 android:textSize="16sp" />
 
-            <!-- Icon inside a circle -->
-            <!-- Using the CircleImageView that was already in your dependencies -->
             <de.hdodenhof.circleimageview.CircleImageView
                 android:id="@+id/ivOrderIcon"
                 android:layout_width="120dp"
@@ -63,7 +57,6 @@
                 app:civ_border_color="#80ffffff"
                 app:civ_border_width="2dp" />
 
-            <!-- Address (Max 3 lines) -->
             <TextView
                 android:id="@+id/tvAddress"
                 android:layout_width="match_parent"
@@ -78,7 +71,6 @@
 
         </LinearLayout>
 
-        <!-- Bottom Action Section -->
         <LinearLayout
             android:id="@+id/llAction"
             android:layout_width="match_parent"
@@ -88,8 +80,6 @@
             android:fitsSystemWindows="true"
             android:orientation="vertical">
 
-            <!-- Full Width Button -->
-            <!-- Using a TextView acts exactly like a Button but avoids default Material inset margins -->
             <TextView
                 android:id="@+id/tvSingleAction"
                 android:layout_width="match_parent"
