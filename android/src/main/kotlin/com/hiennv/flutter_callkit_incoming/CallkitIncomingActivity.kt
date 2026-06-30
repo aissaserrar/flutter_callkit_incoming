@@ -289,6 +289,9 @@ class CallkitIncomingActivity : Activity() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onAcceptClick")
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
+        // Suppress the ongoing "Hang up" notification: the full-screen accept action
+        // opens order details, so the call alert should end immediately.
+        data?.putBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, false)
 
         CallkitNotificationService.startServiceWithAction(
             this@CallkitIncomingActivity,
