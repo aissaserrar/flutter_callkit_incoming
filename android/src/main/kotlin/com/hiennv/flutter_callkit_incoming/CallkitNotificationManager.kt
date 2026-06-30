@@ -570,7 +570,7 @@ class CallkitNotificationManager(
     ): CallkitNotification? {
 
         val isCallingNotificationShow =
-            data.getBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, true)
+            data.getBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, false)
         if (!isCallingNotificationShow) return null
 
         val onGoingNotificationId = data.getString(
@@ -929,8 +929,12 @@ class CallkitNotificationManager(
     }
 
     private fun getAcceptPendingIntent(id: Int, data: Bundle): PendingIntent {
+        // Never show the ongoing "Hang up" notification; accepting opens the app directly.
+        val acceptData = Bundle(data).apply {
+            putBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, false)
+        }
         val intentTransparent = TransparentActivity.getIntent(
-            context, CallkitConstants.ACTION_CALL_ACCEPT, data
+            context, CallkitConstants.ACTION_CALL_ACCEPT, acceptData
         )
         return PendingIntent.getActivity(context, id, intentTransparent, getFlagPendingIntent())
     }

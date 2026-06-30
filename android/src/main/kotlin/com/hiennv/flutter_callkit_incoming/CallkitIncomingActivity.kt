@@ -79,7 +79,20 @@ class CallkitIncomingActivity : Activity() {
         }
     }
 
+    inner class CallActionBroadcastReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!isFinishing) {
+                removeTimeout()
+                finishTask()
+            }
+        }
+    }
+
     private var endedCallkitIncomingBroadcastReceiver = EndedCallkitIncomingBroadcastReceiver()
+    private var callActionBroadcastReceiver = CallActionBroadcastReceiver()
+
+    private val timeoutHandler = Handler(Looper.getMainLooper())
+    private var timeoutRunnable: Runnable? = null
 
     private lateinit var ivBackground: ImageView
 
@@ -134,6 +147,25 @@ class CallkitIncomingActivity : Activity() {
                 IntentFilter("${packageName}.${ACTION_ENDED_CALL_INCOMING}")
             )
         }
+
+        val callActionFilter = IntentFilter().apply {
+            addAction("${packageName}.${CallkitConstants.ACTION_CALL_ACCEPT}")
+            addAction("${packageName}.${CallkitConstants.ACTION_CALL_DECLINE}")
+            addAction("${packageName}.${CallkitConstants.ACTION_CALL_ENDED}")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                callActionBroadcastReceiver,
+                callActionFilter,
+                Context.RECEIVER_EXPORTED,
+            )
+        } else {
+            registerReceiver(
+                callActionBroadcastReceiver,
+                callActionFilter
+            )
+        }
+
         FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.keepRingingOnFullScreen();
     }
 
@@ -256,11 +288,25 @@ class CallkitIncomingActivity : Activity() {
                 ?: currentSystemTime
 
         val timeOut = duration - abs(currentSystemTime - timeStartCall)
-        Handler(Looper.getMainLooper()).postDelayed({
+        timeoutRunnable = Runnable {
             if (!isFinishing) {
+                data?.let {
+                    sendBroadcast(
+                        CallkitIncomingBroadcastReceiver.getIntentTimeout(
+                            this@CallkitIncomingActivity,
+                            it
+                        )
+                    )
+                }
                 finishTask()
             }
-        }, timeOut)
+        }
+        timeoutHandler.postDelayed(timeoutRunnable!!, timeOut)
+    }
+
+    private fun removeTimeout() {
+        timeoutRunnable?.let { timeoutHandler.removeCallbacks(it) }
+        timeoutRunnable = null
     }
 
     private fun initView() {
@@ -287,6 +333,7 @@ class CallkitIncomingActivity : Activity() {
 
     private fun onAcceptClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onAcceptClick")
+        removeTimeout()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
         // Suppress the ongoing "Hang up" notification: the full-screen accept action
@@ -317,6 +364,7 @@ class CallkitIncomingActivity : Activity() {
 
     private fun onDeclineClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onDeclineClick")
+        removeTimeout()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
         val intent =
@@ -340,7 +388,17 @@ class CallkitIncomingActivity : Activity() {
     }
 
     override fun onDestroy() {
-        unregisterReceiver(endedCallkitIncomingBroadcastReceiver)
+        removeTimeout()
+        try {
+            unregisterReceiver(endedCallkitIncomingBroadcastReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver may already be unregistered
+        }
+        try {
+            unregisterReceiver(callActionBroadcastReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver may already be unregistered
+        }
         super.onDestroy()
     }
 

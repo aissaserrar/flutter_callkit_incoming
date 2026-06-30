@@ -66,7 +66,7 @@ data class Data(val args: Map<String, Any?>) {
     var callingNotificationId: String? = null
 
     @JsonProperty("isShowCallingNotification")
-    var isShowCallingNotification: Boolean = true
+    var isShowCallingNotification: Boolean = false
 
     @JsonProperty("callingNotificationSubtitle")
     var callingNotificationSubtitle: String? = null
@@ -379,7 +379,7 @@ data class Data(val args: Map<String, Any?>) {
 
             data.callingNotificationId = bundle.getString(CallkitConstants.EXTRA_CALLKIT_CALLING_ID)
             data.isShowCallingNotification =
-                bundle.getBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, true)
+                bundle.getBoolean(CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW, false)
             data.callingNotificationSubtitle =
                 bundle.getString(CallkitConstants.EXTRA_CALLKIT_CALLING_SUBTITLE, "")
             data.isShowHangup =
