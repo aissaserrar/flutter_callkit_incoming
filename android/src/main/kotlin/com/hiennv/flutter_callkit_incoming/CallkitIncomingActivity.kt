@@ -165,8 +165,6 @@ class CallkitIncomingActivity : Activity() {
                 callActionFilter
             )
         }
-
-        FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.keepRingingOnFullScreen();
     }
 
     private fun wakeLockRequest(duration: Long) {
@@ -247,6 +245,13 @@ class CallkitIncomingActivity : Activity() {
 
         val duration = data?.getLong(CallkitConstants.EXTRA_CALLKIT_DURATION, 0L) ?: 0L
         wakeLockRequest(duration)
+
+        data?.let {
+            FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.apply {
+                keepRingingOnFullScreen()
+                play(it)
+            }
+        }
 
         finishTimeout(data, duration)
 

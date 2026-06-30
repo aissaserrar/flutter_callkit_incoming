@@ -22,8 +22,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.text.TextUtils
-import java.util.Timer
-import java.util.TimerTask
 
 class CallkitSoundPlayerManager(private val context: Context) {
 
@@ -63,6 +61,7 @@ class CallkitSoundPlayerManager(private val context: Context) {
 
     fun stop() {
         this.isPlaying = false
+        keepRingingForFullScreenIntent = false
 
         ringtone?.stop()
         vibrator?.cancel()
@@ -76,6 +75,7 @@ class CallkitSoundPlayerManager(private val context: Context) {
 
     fun destroy() {
         this.isPlaying = false
+        keepRingingForFullScreenIntent = false
 
         ringtone?.stop()
         vibrator?.cancel()
@@ -237,19 +237,9 @@ class CallkitSoundPlayerManager(private val context: Context) {
         return null
     }
 
-    private var ringingTimer: Timer? = null
-
     // This function is called when the incoming call full intent (CallkitIncomingActivity) is shown
     // It prevents the sound from stopping when the screen is turned off because of an auto lock
     fun keepRingingOnFullScreen() {
         keepRingingForFullScreenIntent = true
-        ringingTimer?.cancel()
-        ringingTimer = Timer().apply {
-            schedule(object : TimerTask() {
-                override fun run() {
-                    keepRingingForFullScreenIntent = false
-                }
-            }, 500)
-        }
     }
 }
