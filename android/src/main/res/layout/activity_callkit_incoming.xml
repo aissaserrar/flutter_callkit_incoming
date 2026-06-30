@@ -86,6 +86,7 @@
                 android:layout_height="60dp"
                 android:background="@drawable/bg_button_accept"
                 android:gravity="center"
+                android:paddingHorizontal="16dp"
                 android:text="ACCEPT ORDER"
                 android:textColor="@android:color/white"
                 android:textSize="18sp"
