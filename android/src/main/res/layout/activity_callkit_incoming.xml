@@ -53,7 +53,7 @@
                 android:layout_width="120dp"
                 android:layout_height="120dp"
                 android:layout_marginTop="40dp"
-                android:src="@drawable/ic_default_avatar"
+                android:src="@drawable/ic_cart"
                 app:civ_border_color="#80ffffff"
                 app:civ_border_width="2dp" />
 
