@@ -218,8 +218,23 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                         CallkitConstants.ACTION_CALL_ACCEPT,
                         data
                     )
+
+                    // Notification-style accept (e.g. "Go to order"): the full-screen UI already
+                    // set callingShow=false to suppress the ongoing-call notification. End the
+                    // self-managed Telecom connection immediately so the OS releases call audio
+                    // mode and media apps / the volume rocker return to the media stream.
+                    val showOngoing = data.getBoolean(
+                        CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW,
+                        true
+                    )
+                    if (!showOngoing) {
+                        driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ENDED)
+                        removeCall(context, Data.fromBundle(data))
+                    } else {
+                        addCall(context, Data.fromBundle(data), true)
+                    }
+
                     sendEventFlutter(CallkitConstants.ACTION_CALL_ACCEPT, data)
-                    addCall(context, Data.fromBundle(data), true)
                     FlutterCallkitIncomingPlugin.acceptCallHandleCallback(data)
                 } catch (error: Exception) {
                     Log.e(TAG, null, error)

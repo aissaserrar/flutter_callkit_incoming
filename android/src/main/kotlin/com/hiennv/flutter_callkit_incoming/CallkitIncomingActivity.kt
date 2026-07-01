@@ -339,6 +339,7 @@ class CallkitIncomingActivity : Activity() {
     private fun onAcceptClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onAcceptClick")
         removeTimeout()
+        FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.stop()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
         // Suppress the ongoing "Hang up" notification: the full-screen accept action
@@ -370,6 +371,7 @@ class CallkitIncomingActivity : Activity() {
     private fun onDeclineClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onDeclineClick")
         removeTimeout()
+        FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.stop()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
         val intent =
