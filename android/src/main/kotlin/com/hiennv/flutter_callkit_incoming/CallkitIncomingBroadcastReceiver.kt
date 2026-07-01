@@ -181,13 +181,26 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                     registerTelecomIncomingCall(context, data)
                     val incomingData = Data.fromBundle(data)
                     if (incomingData.isFullScreen) {
-                        val intent = CallkitIncomingActivity.getIntent(context, data)
-                        context.startActivity(intent)
+                        // Anchor the incoming call in the foreground service so the ring and
+                        // timeout survive the activity being hidden/destroyed by the keyguard.
+                        CallkitNotificationService.startServiceWithAction(
+                            context,
+                            CallkitConstants.ACTION_CALL_INCOMING,
+                            data
+                        )
+                        // Best-effort immediate launch; the service notification's
+                        // full-screen intent is the reliable, re-presentable launcher over
+                        // the keyguard (and covers OEMs that drop background startActivity).
+                        try {
+                            context.startActivity(CallkitIncomingActivity.getIntent(context, data))
+                        } catch (e: Exception) {
+                            Log.w(TAG, "startActivity for full-screen incoming failed", e)
+                        }
                     } else {
                         getCallkitNotificationManager()?.showIncomingNotification(data)
-                        sendEventFlutter(CallkitConstants.ACTION_CALL_INCOMING, data)
-                        addCall(context, incomingData)
                     }
+                    sendEventFlutter(CallkitConstants.ACTION_CALL_INCOMING, data)
+                    addCall(context, incomingData)
                 } catch (error: Exception) {
                     Log.e(TAG, null, error)
                 }

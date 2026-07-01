@@ -25,7 +25,6 @@
             android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingActivity"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:noHistory="true"
             android:turnScreenOn="true"
             android:configChanges="orientation"
             android:exported="true"

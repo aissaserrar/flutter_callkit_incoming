@@ -179,7 +179,7 @@ class CallkitNotificationManager(
     }
 
     @SuppressLint("MissingPermission")
-    fun getIncomingNotification(data: Bundle): CallkitNotification? {
+    fun getIncomingNotification(data: Bundle, ownTimeout: Boolean = true): CallkitNotification? {
         data.putLong(EXTRA_TIME_START_CALL, System.currentTimeMillis())
 
         val notificationId =
@@ -197,18 +197,25 @@ class CallkitNotificationManager(
         notificationBuilder?.setOngoing(true)
         notificationBuilder?.setAutoCancel(false)
         notificationBuilder?.setWhen(System.currentTimeMillis())
-        notificationBuilder?.setTimeoutAfter(
-            data.getLong(
-                CallkitConstants.EXTRA_CALLKIT_DURATION, 0L
+        if (ownTimeout) {
+            // When the service owns the timeout (full-screen path), the notification must
+            // NOT self-dismiss — otherwise it races the service-owned timeout and tears
+            // down the foreground state early.
+            notificationBuilder?.setTimeoutAfter(
+                data.getLong(
+                    CallkitConstants.EXTRA_CALLKIT_DURATION, 0L
+                )
             )
-        )
+        }
         notificationBuilder?.setOnlyAlertOnce(true)
         notificationBuilder?.setSound(null)
         notificationBuilder?.setFullScreenIntent(
             getActivityPendingIntent(notificationId, data), true
         )
         notificationBuilder?.setContentIntent(getActivityPendingIntent(notificationId, data))
-        notificationBuilder?.setDeleteIntent(getTimeOutPendingIntent(notificationId, data))
+        if (ownTimeout) {
+            notificationBuilder?.setDeleteIntent(getTimeOutPendingIntent(notificationId, data))
+        }
         val typeCall = data.getInt(CallkitConstants.EXTRA_CALLKIT_TYPE, -1)
         var smallIcon = context.applicationInfo.icon
         if (typeCall > 0) {
@@ -807,6 +814,10 @@ class CallkitNotificationManager(
     }
 
     fun clearIncomingNotification(data: Bundle, isAccepted: Boolean) {
+        // Single choke point for every terminal path (accept/decline/ended/timeout):
+        // cancel the service-owned incoming timeout so nothing re-fires after teardown.
+        CallkitNotificationService.cancelIncomingTimeout()
+
         // Start Signify modification
         // Unregister volume key receiver
         volumeKeyReceiver?.let {
@@ -1000,19 +1011,29 @@ class CallkitNotificationManager(
     }
     // End Signify modification
 
+    // Start the incoming ringtone + register the volume-key escape hatch. Shared by the
+    // non-full-screen heads-up path (showIncomingNotification) and the full-screen path
+    // (CallkitNotificationService). Full-screen calls keep ringing when the screen
+    // auto-locks; the service-owned timeout — not ACTION_SCREEN_OFF — is the guaranteed stop.
+    fun startIncomingRing(data: Bundle) {
+        if (!incomingChannelEnabled()) return
+        if (data.getBoolean(CallkitConstants.EXTRA_CALLKIT_IS_FULL_SCREEN, false)) {
+            callkitSoundPlayerManager?.keepRingingOnFullScreen()
+        }
+        callkitSoundPlayerManager?.play(data)
+        // Start Signify modification
+        volumeKeyReceiver = VolumeKeyBroadcastReceiver()
+        context.registerReceiver(
+            volumeKeyReceiver,
+            IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+        )
+        // End Signify modification
+    }
+
     @SuppressLint("MissingPermission")
     fun showIncomingNotification(data: Bundle) {
         val callkitNotification = getIncomingNotification(data)
-        if (incomingChannelEnabled()) {
-            callkitSoundPlayerManager?.play(data)
-            // Start Signify modification
-            volumeKeyReceiver = VolumeKeyBroadcastReceiver()
-            context.registerReceiver(
-                volumeKeyReceiver,
-                IntentFilter("android.media.VOLUME_CHANGED_ACTION")
-            )
-            // End Signify modification
-        }
+        startIncomingRing(data)
         callkitNotification?.let {
             getNotificationManager().notify(
                 it.id, callkitNotification.notification

@@ -31,7 +31,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import de.hdodenhof.circleimageview.CircleImageView
-import kotlin.math.abs
 import android.view.ViewGroup.MarginLayoutParams
 import android.os.PowerManager
 import android.provider.Settings
@@ -82,7 +81,6 @@ class CallkitIncomingActivity : Activity() {
     inner class CallActionBroadcastReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (!isFinishing) {
-                removeTimeout()
                 finishTask()
             }
         }
@@ -90,9 +88,6 @@ class CallkitIncomingActivity : Activity() {
 
     private var endedCallkitIncomingBroadcastReceiver = EndedCallkitIncomingBroadcastReceiver()
     private var callActionBroadcastReceiver = CallActionBroadcastReceiver()
-
-    private val timeoutHandler = Handler(Looper.getMainLooper())
-    private var timeoutRunnable: Runnable? = null
 
     private lateinit var ivBackground: ImageView
 
@@ -246,14 +241,9 @@ class CallkitIncomingActivity : Activity() {
         val duration = data?.getLong(CallkitConstants.EXTRA_CALLKIT_DURATION, 0L) ?: 0L
         wakeLockRequest(duration)
 
-        data?.let {
-            FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.apply {
-                keepRingingOnFullScreen()
-                play(it)
-            }
-        }
-
-        finishTimeout(data, duration)
+        // The ringtone and the incoming timeout are owned by CallkitNotificationService
+        // (foreground) so they survive this activity being hidden/destroyed by the keyguard.
+        // This activity is a pure UI renderer.
 
         val textAction = data?.getString(CallkitConstants.EXTRA_CALLKIT_TEXT_ACCEPT, "")
         tvSingleAction.text =
@@ -286,34 +276,6 @@ class CallkitIncomingActivity : Activity() {
         }
     }
 
-    private fun finishTimeout(data: Bundle?, duration: Long) {
-        val currentSystemTime = System.currentTimeMillis()
-        val timeStartCall =
-            data?.getLong(CallkitNotificationManager.EXTRA_TIME_START_CALL, currentSystemTime)
-                ?: currentSystemTime
-
-        val timeOut = duration - abs(currentSystemTime - timeStartCall)
-        timeoutRunnable = Runnable {
-            if (!isFinishing) {
-                data?.let {
-                    sendBroadcast(
-                        CallkitIncomingBroadcastReceiver.getIntentTimeout(
-                            this@CallkitIncomingActivity,
-                            it
-                        )
-                    )
-                }
-                finishTask()
-            }
-        }
-        timeoutHandler.postDelayed(timeoutRunnable!!, timeOut)
-    }
-
-    private fun removeTimeout() {
-        timeoutRunnable?.let { timeoutHandler.removeCallbacks(it) }
-        timeoutRunnable = null
-    }
-
     private fun initView() {
         ivBackground = findViewById(R.id.ivBackground)
 
@@ -338,7 +300,6 @@ class CallkitIncomingActivity : Activity() {
 
     private fun onAcceptClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onAcceptClick")
-        removeTimeout()
         FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.stop()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
@@ -370,7 +331,6 @@ class CallkitIncomingActivity : Activity() {
 
     private fun onDeclineClick() {
         // Log.d("CallkitIncomingActivity", "[CALLKIT] 📱 onDeclineClick")
-        removeTimeout()
         FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.stop()
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
 
@@ -395,7 +355,6 @@ class CallkitIncomingActivity : Activity() {
     }
 
     override fun onDestroy() {
-        removeTimeout()
         try {
             unregisterReceiver(endedCallkitIncomingBroadcastReceiver)
         } catch (_: IllegalArgumentException) {
