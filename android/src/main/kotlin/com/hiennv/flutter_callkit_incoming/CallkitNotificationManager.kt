@@ -14,11 +14,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.AudioManager
@@ -57,10 +55,6 @@ class CallkitNotificationManager(
     }
 
     private var dataNotificationPermission: Map<String, Any> = HashMap()
-
-    // Start Signify modification
-    private var volumeKeyReceiver: VolumeKeyBroadcastReceiver? = null
-    // End Signify modification
 
     private var notificationBuilder: NotificationCompat.Builder? = null
     private var notificationViews: RemoteViews? = null
@@ -818,18 +812,6 @@ class CallkitNotificationManager(
         // cancel the service-owned incoming timeout so nothing re-fires after teardown.
         CallkitNotificationService.cancelIncomingTimeout()
 
-        // Start Signify modification
-        // Unregister volume key receiver
-        volumeKeyReceiver?.let {
-            try {
-                context.unregisterReceiver(it)
-            } catch (e: Exception) {
-                // Ignore Receiver may not be registered
-            }
-            volumeKeyReceiver = null
-        }
-        // End Signify modification
-
         callkitSoundPlayerManager?.stop()
 
         context.sendBroadcast(CallkitIncomingActivity.getIntentEnded(context, isAccepted))
@@ -999,35 +981,21 @@ class CallkitNotificationManager(
         return NotificationManagerCompat.from(context)
     }
 
-    // Start Signify modification
-    inner class VolumeKeyBroadcastReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == "android.media.VOLUME_CHANGED_ACTION") {
-                if (callkitSoundPlayerManager?.isPlaying == true) {
-                    callkitSoundPlayerManager.stop()
-                }
-            }
-        }
-    }
-    // End Signify modification
-
-    // Start the incoming ringtone + register the volume-key escape hatch. Shared by the
-    // non-full-screen heads-up path (showIncomingNotification) and the full-screen path
-    // (CallkitNotificationService). Full-screen calls keep ringing when the screen
-    // auto-locks; the service-owned timeout — not ACTION_SCREEN_OFF — is the guaranteed stop.
+    // Start the incoming ringtone. Shared by the non-full-screen heads-up path
+    // (showIncomingNotification) and the full-screen path (CallkitNotificationService).
+    // Full-screen calls keep ringing when the screen auto-locks; the service-owned
+    // timeout — not ACTION_SCREEN_OFF — is the guaranteed stop.
+    //
+    // No VOLUME_CHANGED_ACTION "escape hatch" here: the system broadcasts that action
+    // on its own when Telecom enters ringing mode (contextual volume update), which
+    // used to kill the ring ~0.5s in. User-initiated silencing stays available via the
+    // full-screen activity's volume-down key handler.
     fun startIncomingRing(data: Bundle) {
         if (!incomingChannelEnabled()) return
         if (data.getBoolean(CallkitConstants.EXTRA_CALLKIT_IS_FULL_SCREEN, false)) {
             callkitSoundPlayerManager?.keepRingingOnFullScreen()
         }
         callkitSoundPlayerManager?.play(data)
-        // Start Signify modification
-        volumeKeyReceiver = VolumeKeyBroadcastReceiver()
-        context.registerReceiver(
-            volumeKeyReceiver,
-            IntentFilter("android.media.VOLUME_CHANGED_ACTION")
-        )
-        // End Signify modification
     }
 
     @SuppressLint("MissingPermission")
