@@ -56,6 +56,14 @@ class CallkitConnectionService : ConnectionService() {
             return failed("Empty call id")
         }
 
+        if (CallkitConnection.consumePendingTeardown(callId)) {
+            // The user already acted on the call (accept-as-dismiss, decline,
+            // timeout) before Telecom got around to creating the connection —
+            // cancel it so nothing rings or lingers as an "ongoing call".
+            Log.d(TAG, "onCreateIncomingConnection: id=$callId already dismissed — cancel")
+            return Connection.createCanceledConnection()
+        }
+
         Log.d(TAG, "onCreateIncomingConnection id=$callId caller=${data.nameCaller}")
 
         val connection = CallkitConnection(callId, callBundle).apply {

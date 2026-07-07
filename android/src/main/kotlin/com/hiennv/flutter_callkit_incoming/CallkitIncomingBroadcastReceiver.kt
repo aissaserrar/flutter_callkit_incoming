@@ -142,6 +142,9 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
             )
         }
         try {
+            // A leftover teardown flag from a previous ring of this id must not
+            // cancel this fresh legitimate ring at creation time.
+            CallkitConnection.clearPendingTeardown(parsed.id)
             telecom.addNewIncomingCall(handle, extras)
             Log.d(TAG, "Telecom addNewIncomingCall id=${parsed.id}")
         } catch (e: SecurityException) {
@@ -158,12 +161,46 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             null
         } ?: return
-        val conn = CallkitConnection.find(parsed.id) ?: return
+        val conn = CallkitConnection.find(parsed.id)
+        if (conn == null) {
+            // Terminal action raced ahead of onCreateIncomingConnection — flag
+            // the id so the late-created connection is cancelled instead of
+            // ringing forever, orphaned. (ACCEPT is not terminal; leave it a
+            // no-op.)
+            if (action != CallkitConstants.ACTION_CALL_ACCEPT) {
+                Log.d(TAG, "driveTelecomConnection: no connection yet id=${parsed.id} action=$action — pending teardown")
+                CallkitConnection.markPendingTeardown(parsed.id)
+            }
+            return
+        }
         when (action) {
             CallkitConstants.ACTION_CALL_ACCEPT -> conn.markAccepted()
             CallkitConstants.ACTION_CALL_DECLINE -> conn.markDeclined(context)
             CallkitConstants.ACTION_CALL_ENDED -> conn.markEnded()
             CallkitConstants.ACTION_CALL_TIMEOUT -> conn.markMissed()
+        }
+    }
+
+    /**
+     * Reject/tear down the self-managed Telecom connection without ever
+     * answering it. If the connection has not been created yet (Telecom
+     * delivers onCreateIncomingConnection asynchronously), flag the id so
+     * [CallkitConnectionService] cancels it at creation time.
+     */
+    private fun rejectTelecomConnection(data: Bundle) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val parsed = try {
+            Data.fromBundle(data)
+        } catch (e: Exception) {
+            null
+        } ?: return
+        if (parsed.id.isEmpty()) return
+        val conn = CallkitConnection.find(parsed.id)
+        if (conn != null) {
+            conn.markRejected()
+        } else {
+            Log.d(TAG, "rejectTelecomConnection: no connection yet id=${parsed.id} — pending teardown")
+            CallkitConnection.markPendingTeardown(parsed.id)
         }
     }
 
@@ -223,7 +260,20 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_ACCEPT}" -> {
                 try {
-                    driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ACCEPT)
+                    val showOngoing = data.getBoolean(
+                        CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW,
+                        true
+                    )
+                    if (showOngoing) {
+                        // Real call-style accept: answer and keep the connection active.
+                        driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ACCEPT)
+                    } else {
+                        // Notification-style accept (e.g. "Go to order"): at the Telecom
+                        // level this is a REJECT — the call must never become active, or
+                        // some OEMs keep an "ongoing call" state that blocks other VoIP
+                        // apps (WhatsApp: "can't place call during another call").
+                        rejectTelecomConnection(data)
+                    }
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.ACCEPT, data)
                     // start service and show ongoing call when call is accepted
                     CallkitNotificationService.startServiceWithAction(
@@ -232,16 +282,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                         data
                     )
 
-                    // Notification-style accept (e.g. "Go to order"): the full-screen UI already
-                    // set callingShow=false to suppress the ongoing-call notification. End the
-                    // self-managed Telecom connection immediately so the OS releases call audio
-                    // mode and media apps / the volume rocker return to the media stream.
-                    val showOngoing = data.getBoolean(
-                        CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW,
-                        true
-                    )
                     if (!showOngoing) {
-                        driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ENDED)
                         removeCall(context, Data.fromBundle(data))
                     } else {
                         addCall(context, Data.fromBundle(data), true)

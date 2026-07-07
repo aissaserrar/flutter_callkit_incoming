@@ -63,6 +63,26 @@ class CallkitConnection(
         }
 
         fun activeCount(): Int = activeConnections.size
+
+        /**
+         * Call ids whose Telecom connection must be torn down as soon as it is
+         * created. Guards the race where the user acts on the call (accept-as-
+         * dismiss, decline, end, timeout) before the OS has delivered
+         * [CallkitConnectionService.onCreateIncomingConnection] — otherwise the
+         * late-created connection rings forever, orphaned.
+         */
+        private val pendingTeardown: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+        fun markPendingTeardown(callId: String) {
+            if (callId.isNotEmpty()) pendingTeardown.add(callId)
+        }
+
+        /** Returns true (and clears the flag) if [callId] was flagged for teardown. */
+        fun consumePendingTeardown(callId: String): Boolean = pendingTeardown.remove(callId)
+
+        fun clearPendingTeardown(callId: String) {
+            pendingTeardown.remove(callId)
+        }
     }
 
     init {
@@ -85,7 +105,12 @@ class CallkitConnection(
     override fun onAnswer() {
         super.onAnswer()
         Log.d(TAG, "onAnswer id=$callId")
-        setActive()
+        // There is no real call to answer — the Telecom entry only exists for
+        // ring priority. Activating it here (Bluetooth headset / watch answer)
+        // would leave a permanently "ongoing" call with no UI to end it, so
+        // treat an OS-side answer as a reject. The app's own accept path goes
+        // through the BroadcastReceiver, not this callback.
+        finishWithCause(DisconnectCause.REJECTED)
     }
 
     override fun onReject() {
@@ -197,6 +222,18 @@ class CallkitConnection(
         } catch (e: Exception) {
             Log.w(TAG, "[DIAG-DECLINE-CS] recovery failed: ${e.message}")
         }
+    }
+
+    /**
+     * Reject the call at the Telecom level without ever answering it — the
+     * notification-style accept ("Go to order") is a dismiss, not a phone
+     * answer. Unlike [markDeclined] there is no delayed teardown and no
+     * cold-launch recovery: the accept broadcast path already delivers the
+     * Dart event and launches the app.
+     */
+    fun markRejected() {
+        Log.d(TAG, "markRejected id=$callId")
+        finishWithCause(DisconnectCause.REJECTED)
     }
 
     /** Mark the call as terminated — call ended (either side hung up). */

@@ -350,6 +350,13 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                                 )
                             )
                         }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        // Not in the store (already consumed by accept/timeout) but a
+                        // Telecom connection may still linger — e.g. it was created
+                        // after the accept raced ahead of onCreateIncomingConnection.
+                        // Tear it down directly so Dart endCall always clears the
+                        // OS-level "ongoing call" state.
+                        CallkitConnection.find(data.id)?.markRejected()
                     }
                     result.success(true)
                 }
