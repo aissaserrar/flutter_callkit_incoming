@@ -3,6 +3,7 @@ package com.hiennv.flutter_callkit_incoming
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 
@@ -36,7 +37,7 @@ class TransparentActivity : Activity() {
         val action = intent.action
         if (action == null) {
             Log.w("TransparentActivity", "Intent action is null, finishing activity")
-            finish()
+            finishTask()
             return
         }
 
@@ -49,7 +50,20 @@ class TransparentActivity : Activity() {
         val activityIntent = AppUtils.getAppIntent(this, action, data)
         startActivity(activityIntent)
 
-        finish()
+        // finishAndRemoveTask, not finish(): launched from the singleInstance
+        // ring activity this trampoline is forced into its own task (default
+        // package affinity). A plain finish() leaves that task lingering empty,
+        // and Android re-surfaces the app's main task when it notices the empty
+        // task — the app "reopens itself" seconds after the user switches away.
+        finishTask()
         overridePendingTransition(0, 0)
+    }
+
+    private fun finishTask() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask()
+        } else {
+            finish()
+        }
     }
 }

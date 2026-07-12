@@ -42,6 +42,7 @@
             android:theme="@style/TranslucentTheme"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
+            android:excludeFromRecents="true"
             android:name="com.hiennv.flutter_callkit_incoming.TransparentActivity"/>
 
         <receiver
