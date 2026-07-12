@@ -306,7 +306,12 @@ class CallkitIncomingActivity : Activity() {
         startActivity(acceptIntent)
 
         dismissKeyguard()
-        finish()
+        // finishAndRemoveTask, not finish(): the accept broadcast is sent with an
+        // explicit component (CallkitIncomingBroadcastReceiver), so the dynamic
+        // CallActionBroadcastReceiver never fires here — plain finish() would
+        // leave this singleInstance task lingering empty, and Android re-surfaces
+        // the app's main task when an empty task is noticed (app "reopens itself").
+        finishTask()
     }
 
     private fun dismissKeyguard() {
