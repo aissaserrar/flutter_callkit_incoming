@@ -13,6 +13,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
 
+    <!-- Needed to detect a real (cellular/other VoIP) incoming call while an
+         order ring is active, so the order ring is dismissed immediately and
+         does not re-surface during/after the phone call. The host app must
+         request this dangerous permission at runtime; when not granted the
+         RealCallObserver falls back to an audio-focus heuristic. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
     <uses-permission android:name="${applicationId}.PERMISSION_CALL" />
 
     <permission

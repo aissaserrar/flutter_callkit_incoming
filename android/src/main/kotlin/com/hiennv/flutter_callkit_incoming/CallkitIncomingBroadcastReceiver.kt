@@ -260,6 +260,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_ACCEPT}" -> {
                 try {
+                    CallkitNotificationService.cancelRealCallObserver()
                     val showOngoing = data.getBoolean(
                         CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW,
                         true
@@ -297,6 +298,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_DECLINE}" -> {
                 try {
+                    CallkitNotificationService.cancelRealCallObserver()
                     driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_DECLINE)
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.DECLINE, data)
                     // clear notification
@@ -310,6 +312,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_ENDED}" -> {
                 try {
+                    CallkitNotificationService.cancelRealCallObserver()
                     driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ENDED)
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.END, data)
                     // clear notification and stop service
@@ -324,6 +327,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_TIMEOUT}" -> {
                 try {
+                    CallkitNotificationService.cancelRealCallObserver()
                     driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_TIMEOUT)
                     // clear notification and show miss notification
                     val notificationManager = getCallkitNotificationManager()

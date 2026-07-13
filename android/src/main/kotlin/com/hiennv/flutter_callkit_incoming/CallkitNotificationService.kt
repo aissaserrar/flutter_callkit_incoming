@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
@@ -57,6 +58,64 @@ class CallkitNotificationService : Service() {
         fun cancelIncomingTimeout() {
             incomingTimeoutRunnable?.let { incomingTimeoutHandler.removeCallbacks(it) }
             incomingTimeoutRunnable = null
+        }
+
+        // Watches for a real (cellular/other VoIP) incoming call while an order
+        // ring is active, so the ring is dismissed immediately instead of
+        // re-surfacing during/after the phone call. Lives here, next to the
+        // incoming-timeout, because both must survive the no-history incoming
+        // activity being hidden/destroyed by the keyguard.
+        private var realCallObserver: RealCallObserver? = null
+
+        /**
+         * Begins watching for a real incoming call while the ring for [data]
+         * is active. When one is detected, the ring is torn down via the
+         * existing TIMEOUT path (clears the notification, rejects the self-
+         * managed Telecom connection, shows the missed-order notification).
+         */
+        fun startRealCallObserver(context: Context, data: Bundle) {
+            cancelRealCallObserver()
+            val appContext = context.applicationContext
+            realCallObserver = RealCallObserver(appContext) {
+                dismissOnRealCall(appContext)
+            }.also { it.start() }
+        }
+
+        /**
+         * Stops the real-call observer without firing it. Call on every terminal
+         * path (accept/decline/ended/timeout) so the listener never outlives the
+         * ring. Idempotent.
+         */
+        fun cancelRealCallObserver() {
+            realCallObserver?.stop()
+            realCallObserver = null
+        }
+
+        /**
+         * Teardown invoked when a real incoming call is detected while an order
+         * ring is active. Reuses the TIMEOUT broadcast path so all of the
+         * existing cleanup (notification clear, Telecom reject, missed-order
+         * notification, Flutter event) runs unchanged for every active call.
+         */
+        private fun dismissOnRealCall(context: Context) {
+            Log.d("CallkitNotificationService", "real call detected → dismissing order ring(s)")
+            // Stop the ringtone/vibration immediately, before the broadcast
+            // round-trip, so the driver hears the real call at once.
+            FlutterCallkitIncomingPlugin.getInstance()?.getCallkitSoundPlayerManager()?.stop()
+            cancelIncomingTimeout()
+            try {
+                getDataActiveCalls(context).forEach { active ->
+                    context.sendBroadcast(
+                        CallkitIncomingBroadcastReceiver.getIntentTimeout(
+                            context,
+                            active.toBundle()
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w("CallkitNotificationService", "dismissOnRealCall failed: ${e.message}")
+            }
+            stopService(context)
         }
 
 
@@ -117,6 +176,9 @@ class CallkitNotificationService : Service() {
                         startCallForeground(incoming.id, incoming.notification)
                         nm.startIncomingRing(data)
                         scheduleIncomingTimeout(this, data)
+                        // Arm real-call detection so the ring steps aside the
+                        // instant a real phone call arrives (see RealCallObserver).
+                        startRealCallObserver(this, data)
                     } else {
                         // Never leave a startForegroundService() without a startForeground()
                         // call, or the OS kills the process. The manager may be momentarily
@@ -141,6 +203,7 @@ class CallkitNotificationService : Service() {
         }
         if (intent?.action === CallkitConstants.ACTION_CALL_ACCEPT) {
             cancelIncomingTimeout()
+            cancelRealCallObserver()
             intent.getBundleExtra(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
                 ?.let {
                     getCallkitNotificationManager()?.clearIncomingNotification(it, true)
