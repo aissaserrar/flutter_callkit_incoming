@@ -233,12 +233,13 @@ class CallkitNotificationService : Service() {
     private fun startCallForeground(notificationId: Int, notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Kabsa Driver uses CallKit only as a visual/audio alert for new order
-            // assignments; it never captures microphone or camera. Restrict the FGS
-            // type to phoneCall so Android 16 does not require RECORD_AUDIO/CAMERA.
+            // assignments; it never captures microphone or camera and is no longer a
+            // Telecom phone call. `specialUse` is the honest FGS type for the
+            // incoming-delivery-order ring; the subtype is declared in the manifest.
             startForeground(
                 notificationId,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
             )
         } else {
             startForeground(notificationId, notification)

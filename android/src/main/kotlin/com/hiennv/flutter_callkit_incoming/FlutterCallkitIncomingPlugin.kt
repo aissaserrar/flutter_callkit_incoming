@@ -3,7 +3,6 @@ package com.hiennv.flutter_callkit_incoming
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -180,9 +179,9 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         sharePluginWithRegister(flutterPluginBinding)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            InAppCallManager(flutterPluginBinding.applicationContext).registerPhoneAccount()
-        }
+        // The plugin no longer registers a Telecom ConnectionService / PhoneAccount.
+        // The order ring is a foreground-service notification, not a real phone call,
+        // so there is no phone account to register here.
     }
 
     public fun showIncomingNotification(data: Data) {
@@ -350,14 +349,11 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                                 )
                             )
                         }
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        // Not in the store (already consumed by accept/timeout) but a
-                        // Telecom connection may still linger — e.g. it was created
-                        // after the accept raced ahead of onCreateIncomingConnection.
-                        // Tear it down directly so Dart endCall always clears the
-                        // OS-level "ongoing call" state.
-                        CallkitConnection.find(data.id)?.markRejected()
                     }
+                    // No Telecom connection fallback anymore: the ring is a
+                    // notification service, so there is no lingering OS-level
+                    // "ongoing call" state to clear when the call is not in the
+                    // active-calls store.
                     result.success(true)
                 }
 

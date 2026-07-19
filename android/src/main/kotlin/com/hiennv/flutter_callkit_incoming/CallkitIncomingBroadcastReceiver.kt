@@ -1,16 +1,12 @@
 package com.hiennv.flutter_callkit_incoming
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.telecom.TelecomManager
 import android.util.Log
-import androidx.core.content.ContextCompat
 
 class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
@@ -113,99 +109,6 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
     }
 
     @SuppressLint("MissingPermission")
-    private fun registerTelecomIncomingCall(context: Context, data: Bundle) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val parsed = try {
-            Data.fromBundle(data)
-        } catch (e: Exception) {
-            null
-        } ?: return
-        if (parsed.id.isEmpty()) return
-        if (CallkitConnection.find(parsed.id) != null) {
-            Log.d(TAG, "Telecom call already registered id=${parsed.id} — skip")
-            return
-        }
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.MANAGE_OWN_CALLS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            Log.w(TAG, "MANAGE_OWN_CALLS not granted — Telecom incoming skipped")
-            return
-        }
-        val telecom = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager ?: return
-        val manager = InAppCallManager(context.applicationContext)
-        val handle = manager.getPhoneAccountHandle()
-        val extras = Bundle().apply {
-            putBundle(CallkitConnection.EXTRA_CALL_BUNDLE, data)
-            putInt(
-                TelecomManager.EXTRA_INCOMING_VIDEO_STATE,
-                android.telecom.VideoProfile.STATE_AUDIO_ONLY,
-            )
-        }
-        try {
-            // A leftover teardown flag from a previous ring of this id must not
-            // cancel this fresh legitimate ring at creation time.
-            CallkitConnection.clearPendingTeardown(parsed.id)
-            telecom.addNewIncomingCall(handle, extras)
-            Log.d(TAG, "Telecom addNewIncomingCall id=${parsed.id}")
-        } catch (e: SecurityException) {
-            Log.w(TAG, "Telecom addNewIncomingCall rejected: ${e.message}")
-        } catch (e: Exception) {
-            Log.w(TAG, "Telecom addNewIncomingCall error: ${e.message}")
-        }
-    }
-
-    private fun driveTelecomConnection(context: Context, data: Bundle, action: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
-        val parsed = try {
-            Data.fromBundle(data)
-        } catch (e: Exception) {
-            null
-        } ?: return
-        val conn = CallkitConnection.find(parsed.id)
-        if (conn == null) {
-            // Terminal action raced ahead of onCreateIncomingConnection — flag
-            // the id so the late-created connection is cancelled instead of
-            // ringing forever, orphaned. (ACCEPT is not terminal; leave it a
-            // no-op.)
-            if (action != CallkitConstants.ACTION_CALL_ACCEPT) {
-                Log.d(TAG, "driveTelecomConnection: no connection yet id=${parsed.id} action=$action — pending teardown")
-                CallkitConnection.markPendingTeardown(parsed.id)
-            }
-            return
-        }
-        when (action) {
-            CallkitConstants.ACTION_CALL_ACCEPT -> conn.markAccepted()
-            CallkitConstants.ACTION_CALL_DECLINE -> conn.markDeclined(context)
-            CallkitConstants.ACTION_CALL_ENDED -> conn.markEnded()
-            CallkitConstants.ACTION_CALL_TIMEOUT -> conn.markMissed()
-        }
-    }
-
-    /**
-     * Reject/tear down the self-managed Telecom connection without ever
-     * answering it. If the connection has not been created yet (Telecom
-     * delivers onCreateIncomingConnection asynchronously), flag the id so
-     * [CallkitConnectionService] cancels it at creation time.
-     */
-    private fun rejectTelecomConnection(data: Bundle) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
-        val parsed = try {
-            Data.fromBundle(data)
-        } catch (e: Exception) {
-            null
-        } ?: return
-        if (parsed.id.isEmpty()) return
-        val conn = CallkitConnection.find(parsed.id)
-        if (conn != null) {
-            conn.markRejected()
-        } else {
-            Log.d(TAG, "rejectTelecomConnection: no connection yet id=${parsed.id} — pending teardown")
-            CallkitConnection.markPendingTeardown(parsed.id)
-        }
-    }
-
-
-    @SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA) ?: return
@@ -215,10 +118,9 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
         when (action) {
             "${context.packageName}.${CallkitConstants.ACTION_CALL_INCOMING}" -> {
                 try {
-                    registerTelecomIncomingCall(context, data)
                     val incomingData = Data.fromBundle(data)
                     if (incomingData.isFullScreen) {
-                        // Anchor the incoming call in the foreground service so the ring and
+                        // Anchor the incoming ring in the foreground service so the ring and
                         // timeout survive the activity being hidden/destroyed by the keyguard.
                         CallkitNotificationService.startServiceWithAction(
                             context,
@@ -265,16 +167,9 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                         CallkitConstants.EXTRA_CALLKIT_CALLING_SHOW,
                         true
                     )
-                    if (showOngoing) {
-                        // Real call-style accept: answer and keep the connection active.
-                        driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ACCEPT)
-                    } else {
-                        // Notification-style accept (e.g. "Go to order"): at the Telecom
-                        // level this is a REJECT — the call must never become active, or
-                        // some OEMs keep an "ongoing call" state that blocks other VoIP
-                        // apps (WhatsApp: "can't place call during another call").
-                        rejectTelecomConnection(data)
-                    }
+                    // No Telecom connection to drive: the ring is a notification
+                    // service, not a phone call. The accept just clears the ring
+                    // (via the service action below) and emits the event/callback.
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.ACCEPT, data)
                     // start service and show ongoing call when call is accepted
                     CallkitNotificationService.startServiceWithAction(
@@ -299,7 +194,6 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
             "${context.packageName}.${CallkitConstants.ACTION_CALL_DECLINE}" -> {
                 try {
                     CallkitNotificationService.cancelRealCallObserver()
-                    driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_DECLINE)
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.DECLINE, data)
                     // clear notification
                     getCallkitNotificationManager()?.clearIncomingNotification(data, false)
@@ -313,7 +207,6 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
             "${context.packageName}.${CallkitConstants.ACTION_CALL_ENDED}" -> {
                 try {
                     CallkitNotificationService.cancelRealCallObserver()
-                    driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_ENDED)
                     FlutterCallkitIncomingPlugin.notifyEventCallbacks(CallkitEventCallback.CallEvent.END, data)
                     // clear notification and stop service
                     getCallkitNotificationManager()?.clearIncomingNotification(data, false)
@@ -328,7 +221,6 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
             "${context.packageName}.${CallkitConstants.ACTION_CALL_TIMEOUT}" -> {
                 try {
                     CallkitNotificationService.cancelRealCallObserver()
-                    driveTelecomConnection(context, data, CallkitConstants.ACTION_CALL_TIMEOUT)
                     // clear notification and show miss notification
                     val notificationManager = getCallkitNotificationManager()
                     notificationManager?.clearIncomingNotification(data, false)

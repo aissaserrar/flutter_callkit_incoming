@@ -9,15 +9,15 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
 
     <!-- Needed to detect a real (cellular/other VoIP) incoming call while an
          order ring is active, so the order ring is dismissed immediately and
-         does not re-surface during/after the phone call. The host app must
-         request this dangerous permission at runtime; when not granted the
-         RealCallObserver falls back to an audio-focus heuristic. -->
+         does not overlap the phone call. The host app must request this
+         dangerous permission at runtime; when not granted the ring simply
+         plays to completion (it is a notification now, not a real Telecom call,
+         so it can no longer block the incoming call). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <uses-permission android:name="${applicationId}.PERMISSION_CALL" />
@@ -66,23 +66,25 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            The order ring is a foreground service so it survives the keyguard
+            and the ringtone/timeout keep running while the screen is locked.
+            This is NOT a phone call: the plugin no longer registers a Telecom
+            ConnectionService (that caused real cellular/VoIP calls to be
+            blocked and the app to self-resurface). `specialUse` is the correct
+            FGS type for a user-facing delivery-order alert; the subtype below
+            is declared for the Play Console foreground-service declaration.
+        -->
         <service
             android:enabled="true"
             android:exported="true"
             android:stopWithTask="false"
-            android:foregroundServiceType="phoneCall"
+            android:foregroundServiceType="specialUse"
             android:permission="${applicationId}.PERMISSION_CALL"
             android:name="com.hiennv.flutter_callkit_incoming.CallkitNotificationService">
-        </service>
-
-        <service
-            android:name="com.hiennv.flutter_callkit_incoming.CallkitConnectionService"
-            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
-            android:foregroundServiceType="phoneCall"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.telecom.ConnectionService" />
-            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Incoming delivery order alert: plays a ringtone and shows a full-screen notification so the driver is promptly notified of a new assigned order." />
         </service>
 
     </application>
