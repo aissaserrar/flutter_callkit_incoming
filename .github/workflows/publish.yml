@@ -1,21 +1,18 @@
 name: Publish to pub.dev
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
-      - master
+      - master  # pub.dev OIDC only supports 'push' events, not 'pull_request'
   workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
 
 jobs:
   publish:
     name: Publish Flutter Package
-    # Run when PR is merged, or when triggered manually
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write  # needed to push git tag
-      id-token: write  # needed for pub.dev OIDC authentication
+      id-token: write  # needed for pub.dev OIDC authentication (if configured on pub.dev admin)
 
     steps:
       - name: Checkout repository
@@ -60,6 +57,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Setup pub credentials
+        run: |
+          mkdir -p ~/.config/dart
+          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.config/dart/pub-credentials.json
 
       - name: Publish to pub.dev
         if: steps.tag_check.outputs.exists == 'false'
